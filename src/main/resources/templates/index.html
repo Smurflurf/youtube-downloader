@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simons Downloader</title>
+    <style>
+        /* CSS für ein sauberes, zentriertes Layout */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+
+        main {
+            text-align: center;
+            padding: 2rem;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            margin-top: 0;
+        }
+
+        .input-group {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        #youtube-url {
+            padding: 0.75rem;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px 0 0 4px;
+            width: 300px;
+        }
+
+        #download-btn {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            border: 1px solid #007bff;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            border-radius: 0 4px 4px 0;
+            transition: background-color 0.2s;
+        }
+
+        #download-btn:hover {
+            background-color: #0056b3;
+        }
+        
+        #download-btn:disabled {
+            background-color: #aaa;
+            cursor: not-allowed;
+            border-color: #aaa;
+        }
+
+        #status-message {
+            margin-top: 1rem;
+            min-height: 1.2em;
+            font-weight: 500;
+        }
+        
+        .error {
+            color: #d9534f;
+        }
+
+    </style>
+</head>
+<body>
+
+    <main>
+        <h1>Simons YouTube zu MP3 Downloader</h1>
+        <p>Einfach den YouTube-Link einfügen und Download drücken.</p>
+        
+        <form id="download-form" class="input-group">
+            <input type="url" id="youtube-url" placeholder="https://www.youtube.com/watch?v=..." required>
+            <button type="submit" id="download-btn">Download</button>
+        </form>
+
+        <p id="status-message"></p>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('download-form');
+            const urlInput = document.getElementById('youtube-url');
+            const downloadBtn = document.getElementById('download-btn');
+            const statusMessage = document.getElementById('status-message');
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault(); 
+
+                const youtubeUrl = urlInput.value.trim();
+                if (!youtubeUrl) {
+                    statusMessage.textContent = 'Bitte gib eine URL ein.';
+                    statusMessage.className = 'error';
+                    return;
+                }
+
+                statusMessage.textContent = 'Download wird vorbereitet... Dies kann einen Moment dauern.';
+                statusMessage.className = '';
+                downloadBtn.disabled = true;
+
+                try {
+                    const response = await fetch('/api/download', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ url: youtubeUrl })
+                    });
+
+                    if (!response.ok) {
+                        // Wenn der Server einen Fehler meldet (z.B. ungültige URL)
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || 'Ein unbekannter Fehler ist aufgetreten.');
+                    }
+
+                    // Die Datei vom Server empfangen
+                    statusMessage.textContent = 'Download startet...';
+
+                    // 1. Dateinamen aus dem Header extrahieren (wird vom Backend gesetzt)
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = 'download.mp3'; // Fallback-Name
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                        if (filenameMatch.length > 1) {
+                            filename = filenameMatch[1];
+                        }
+                    }
+
+                    // 2. Die Antwort als "Blob" (Binary Large Object) erhalten
+                    const blob = await response.blob();
+
+                    // 3. Einen unsichtbaren Download-Link erstellen und klicken
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+
+                    // 4. Aufräumen
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                    
+                    statusMessage.textContent = 'Download erfolgreich!';
+
+                } catch (error) {
+                    statusMessage.textContent = `Fehler: ${error.message}`;
+                    statusMessage.className = 'error';
+                } finally {
+                    // UI wieder freigeben
+                    downloadBtn.disabled = false;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
