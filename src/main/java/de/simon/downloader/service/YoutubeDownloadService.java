@@ -2,6 +2,8 @@ package de.simon.downloader.service;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Service;
 
@@ -13,6 +15,8 @@ import com.sapher.youtubedl.YoutubeDLResponse;
 public class YoutubeDownloadService {
 
     private static final Path DOWNLOAD_DIRECTORY = Path.of(System.getProperty("java.io.tmpdir"), "yt-downloads");
+    private static final Pattern YOUTUBE_VIDEO_ID_PATTERN = Pattern.compile("([a-zA-Z0-9_-]+)");
+    private static final String YOUTUBE_VIDEO_PRE_URL = "https://www.youtube.com/watch?v=";
 
     public YoutubeDownloadService() {
         File dir = DOWNLOAD_DIRECTORY.toFile();
@@ -22,9 +26,8 @@ public class YoutubeDownloadService {
     }
 
     public File downloadAsMp3(String youtubeUrl) throws Exception {
+    	youtubeUrl = sanitize(youtubeUrl);    	
         YoutubeDLRequest request = new YoutubeDLRequest(youtubeUrl, DOWNLOAD_DIRECTORY.toString());
-        
-//        	request.setOption("cookies", "./cookies.txt");
         
         request.setOption("extract-audio");
         request.setOption("audio-format", "mp3");
@@ -47,6 +50,15 @@ public class YoutubeDownloadService {
         return downloadedFile;
     }
 
+    private String sanitize(String url) {
+    	Matcher matcher = YOUTUBE_VIDEO_ID_PATTERN.matcher(url.replace(YOUTUBE_VIDEO_PRE_URL, ""));
+    	if(matcher.find()) {
+    		System.out.println(matcher.group());
+    		return YOUTUBE_VIDEO_PRE_URL + matcher.group();
+    	}
+    	return url;
+    }
+    
     private String extractFilePath(String ytDlpOutput) {
         String finalFilePath = null;
         for (String line : ytDlpOutput.split("\n")) {
